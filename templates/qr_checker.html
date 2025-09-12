@@ -144,8 +144,8 @@
                 if (data.status === 'success') {
                     console.log(data.message);
                     // Воспроизводим звук для добавленного QR-кода
-                    const audio = new Audio('/static/sound7.m4a');
-                    audio.play().catch(e => console.log('Audio play error:', e));
+                    // const audio = new Audio('/static/sound7.m4a');
+                    // audio.play().catch(e => console.log('Audio play error:', e));
                 } else {
                     console.log(data.message);
                 }
@@ -228,8 +228,8 @@
             if (event.key === 'Control') {
                 ctrlPressed = true;
             } 
-            // else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
-            else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            else if (event.key === 'y' || event.key === 'Y' || event.key === 'н' || event.key === 'Н') {
+            // else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 qPressed = true;
             }
             
@@ -243,8 +243,8 @@
             if (event.key === 'Control') {
                 ctrlPressed = false;
             } 
-            else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            // else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+            // else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            else if (event.key === 'y' || event.key === 'Y' || event.key === 'н' || event.key === 'Н') {
                 qPressed = false;
             }
         });

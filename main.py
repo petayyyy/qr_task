@@ -9,7 +9,10 @@ from pyzbar import pyzbar
 
 # out system
 from clover.srv import SetLEDEffect
-import pigpio
+try:
+    import pigpio
+except:
+    isSound = False
 
 app = Flask(__name__)
 bridge = CvBridge()
@@ -31,59 +34,65 @@ manual_qr_counter = 0   # Счётчик для ручного добавлен�
 # out systems
 isLed = True
 isSound = False
-soundPin = 11
-pi = pigpio.pi()
-pi.set_mode(soundPin, pigpio.OUTPUT)
+# soundPin = 11
+# pi = pigpio.pi()
+# pi.set_mode(soundPin, pigpio.OUTPUT)
 
 def setFound():
     global isLed, isSound, soundPin
     if (not isLed and not isSound): return
     if (isLed):
         set_effect(effect='blink', r=0, g=255, b=0)
-    if (isSound):
-        pi.write(soundPin, 1)
+    # if (isSound):
+    #     pi.write(soundPin, 1)
     
     rospy.sleep(3)
     
     if (isLed):
         set_effect(r=0, g=0, b=0)
-    if (isSound):
-        pi.write(soundPin, 0)
+    # if (isSound):
+    #     pi.write(soundPin, 0)
 
 def setEnd():
     global isLed, isSound, soundPin
     if (not isLed and not isSound): return
-
-    for i in range(5):
+    
+    for i in range(3):
         if (isLed):
             if (i % 2 == 0): set_effect(r=255, g=0, b=0)
             else: set_effect(r=0, g=0, b=255)
-        if (isSound):
-            pi.write(soundPin, 1)
+        # if (isSound):
+        #     pi.write(soundPin, 1)
         rospy.sleep(1)
         
         if (isLed):
             set_effect(r=0, g=0, b=0)
-        if (isSound):
-            pi.write(soundPin, 0)
+        # if (isSound):
+        #     pi.write(soundPin, 0)
         rospy.sleep(1)
 
 def setQr(qr_data:str):
     global detection_active, ros_initialized, found_qrs, attempt_active, all_found_flag
     # Добавляем только новые уникальные QR-коды
     if ("MANUAL_QR" in qr_data or (qr_data not in found_qrs)) and len(found_qrs) < max_qrs:
-        if (len(found_qrs) < max_qrs):
+        if (len(found_qrs) < max_qrs-1):
             found_qrs.add(qr_data)
             print(f"Обнаружен новый QR-код: {qr_data}")
             # Добавляем в очередь
             qr_queue.put(qr_data)
-            setFound()
+            # setFound()
+            led_thread1 = threading.Thread(target=setFound)
+            led_thread1.daemon = True
+            led_thread1.start()
         elif (len(found_qrs) == max_qrs-1):
             found_qrs.add(qr_data)
             print("Все QR-коды найдены!")
             all_found_flag = True
             qr_queue.put("ALL_FOUND")
-            setEnd()
+            # setEnd()
+            led_thread2 = threading.Thread(target=setEnd)
+            led_thread2.daemon = True
+            led_thread2.start()
 
 def image_callback(data):
     global detection_active, ros_initialized, found_qrs, attempt_active, all_found_flag
