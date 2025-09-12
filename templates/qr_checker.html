@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QR Code Detector</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            text-align: center;
+            position: relative;
+            min-height: 100vh;
+        }
+        .qr-status {
+            font-size: 20px;
+            margin: 10px;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .found {
+            color: green;
+        }
+        .not-found {
+            color: red;
+        }
+        .completion-message {
+            font-size: 24px;
+            font-weight: bold;
+            color: green;
+            margin: 20px;
+            padding: 20px;
+            border: 2px solid green;
+            border-radius: 10px;
+            background-color: #eaffea;
+        }
+        .timer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+        }
+        .control-button {
+            font-size: 20px;
+            padding: 15px 30px;
+            margin: 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .control-button.stop {
+            background-color: #f44336;
+        }
+        .control-button:hover {
+            opacity: 0.9;
+        }
+        .hotkey-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-size: 14px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+        }
+    </style>
+    <script>
+        let allFound = false;
+        let attemptActive = false;
+        let timerInterval;
+        let ctrlPressed = false;
+        let qPressed = false;
+        
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const millis = Math.floor((seconds * 1000) % 1000);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+        }
+        
+        function updateTimer() {
+            const timerElement = document.getElementById('timer');
+            if (attemptActive) {
+                const currentTime = parseFloat(timerElement.dataset.time) + 0.01;
+                timerElement.dataset.time = currentTime;
+                timerElement.textContent = formatTime(currentTime);
+            }
+        }
+        
+        function toggleAttempt() {
+            fetch('/toggle_attempt', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    attemptActive = true;
+                    allFound = false;
+                    document.getElementById('attempt-button').textContent = 'Остановить попытку';
+                    document.getElementById('attempt-button').classList.add('stop');
+                    
+                    // Запускаем таймер
+                    document.getElementById('timer').dataset.time = 0;
+                    timerInterval = setInterval(updateTimer, 10);
+                    
+                    // Скрываем сообщение о завершении
+                    document.getElementById('completion-message').style.display = 'none';
+                } else {
+                    attemptActive = false;
+                    document.getElementById('attempt-button').textContent = 'Начать попытку';
+                    document.getElementById('attempt-button').classList.remove('stop');
+                    
+                    // Останавливаем таймер
+                    clearInterval(timerInterval);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function manualAddQr() {
+            fetch('/manual_add_qr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    console.log(data.message);
+                    // Воспроизводим звук для добавленного QR-кода
+                    const audio = new Audio('/static/sound7.m4a');
+                    audio.play().catch(e => console.log('Audio play error:', e));
+                } else {
+                    console.log(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function checkQR() {
+            fetch('/qr_status')
+                .then(response => response.json())
+                .then(data => {
+                    // Обновляем статусы QR-кодов
+                    const qrList = document.getElementById('qr-list');
+                    qrList.innerHTML = '';
+                    
+                    data.qr_statuses.forEach((status, index) => {
+                        const qrItem = document.createElement('div');
+                        qrItem.className = 'qr-status';
+                        
+                        const statusText = document.createElement('span');
+                        statusText.textContent = `QR ${index + 1}: ${status.found ? status.code : 'Не найден'}`;
+                        
+                        const statusIcon = document.createElement('span');
+                        statusIcon.textContent = status.found ? '✓' : '✗';
+                        statusIcon.className = status.found ? 'found' : 'not-found';
+                        statusIcon.style.fontSize = '24px';
+                        
+                        qrItem.appendChild(statusText);
+                        qrItem.appendChild(statusIcon);
+                        qrList.appendChild(qrItem);
+                    });
+                    
+                    // Воспроизводим звук для новых QR-кодов
+                    if (data.qr_codes && data.qr_codes.length > 0) {
+                        data.qr_codes.forEach(() => {
+                            const audio = new Audio('/static/sound7.m4a');
+                            audio.play().catch(e => console.log('Audio play error:', e));
+                        });
+                    }
+                    
+                    // Проверяем, все ли QR-коды найдены
+                    if (data.all_found && !allFound) {
+                        allFound = true;
+                        document.getElementById('completion-message').style.display = 'block';
+                        
+                        // Останавливаем попытку
+                        if (attemptActive) {
+                            toggleAttempt();
+                        }
+                        
+                        // Воспроизводим супер звук
+                        const audio = new Audio('/static/sound5.mp4');
+                        audio.play().catch(e => console.log('Audio play error:', e));
+                    }
+                    
+                    // Обновляем счетчик
+                    document.getElementById('counter').textContent = 
+                        `Найдено: ${data.found_count} из ${data.max_qrs}`;
+                        
+                    // Обновляем состояние попытки
+                    attemptActive = data.attempt_active;
+                    if (!attemptActive && timerInterval) {
+                        clearInterval(timerInterval);
+                        document.getElementById('attempt-button').textContent = 'Начать попытку';
+                        document.getElementById('attempt-button').classList.remove('stop');
+                    }
+                    
+                    // Обновляем таймер с сервера, если попытка активна
+                    if (attemptActive) {
+                        document.getElementById('timer').dataset.time = data.attempt_duration;
+                        document.getElementById('timer').textContent = formatTime(data.attempt_duration);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Обработчики клавиш
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Control') {
+                ctrlPressed = true;
+            } else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+                qPressed = true;
+            }
+            
+            // Проверяем комбинацию Ctrl+Q
+            if (ctrlPressed && qPressed && attemptActive && !allFound) {
+                manualAddQr();
+            }
+        });
+        
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'Control') {
+                ctrlPressed = false;
+            } else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+                qPressed = false;
+            }
+        });
+
+        // Проверяем статус каждые 0.5 секунд
+        setInterval(checkQR, 500);
+        
+        // Проверяем сразу при загрузке страницы
+        window.onload = function() {
+            checkQR();
+            document.getElementById('timer').dataset.time = 0;
+        };
+    </script>
+</head>
+<body>
+    <h1>Детектор QR-кодов</h1>
+    
+    <button id="attempt-button" class="control-button" onclick="toggleAttempt()">
+        Начать попытку
+    </button>
+    
+    <div id="counter">Найдено: 0 из 6</div>
+    <div id="qr-list">
+        <!-- Здесь будут отображаться статусы QR-кодов -->
+    </div>
+    <div id="completion-message" class="completion-message" style="display: none;">
+        Попытка закончена! Все QR-коды найдены.
+    </div>
+    
+    <div id="timer" class="timer" data-time="0">00:00.000</div>
+    <div class="hotkey-info">Горячая клавиша: Ctrl+Q - добавить QR-код вручную</div>
+</body>
+</html>
