@@ -166,7 +166,8 @@
                         qrItem.className = 'qr-status';
                         
                         const statusText = document.createElement('span');
-                        statusText.textContent = `QR ${index + 1}: ${status.found ? status.code : 'Не найден'}`;
+                        // statusText.textContent = `QR ${index + 1}: ${status.found ? status.code : 'Не найден'}`;
+                        statusText.textContent = `QR ${index + 1}: ${status.found ? 'Найден' : 'Не найден'}`;
                         
                         const statusIcon = document.createElement('span');
                         statusIcon.textContent = status.found ? '✓' : '✗';
@@ -226,7 +227,9 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Control') {
                 ctrlPressed = true;
-            } else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+            } 
+            // else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+            else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 qPressed = true;
             }
             
@@ -239,7 +242,9 @@
         document.addEventListener('keyup', (event) => {
             if (event.key === 'Control') {
                 ctrlPressed = false;
-            } else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
+            } 
+            else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+            // else if (event.key === 'q' || event.key === 'Q' || event.key === 'й' || event.key === 'Й') {
                 qPressed = false;
             }
         });
@@ -270,6 +275,6 @@
     </div>
     
     <div id="timer" class="timer" data-time="0">00:00.000</div>
-    <div class="hotkey-info">Горячая клавиша: Ctrl+Q - добавить QR-код вручную</div>
+    <!-- <div class="hotkey-info">Горячая клавиша: Ctrl+Q - добавить QR-код вручную</div> -->
 </body>
 </html>
