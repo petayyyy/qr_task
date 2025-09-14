@@ -75,6 +75,20 @@
             padding: 10px 15px;
             border-radius: 10px;
         }
+        .name-input {
+            margin: 20px;
+        }
+        .name-input input {
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .name-error {
+            color: red;
+            display: none;
+            margin-top: 5px;
+        }
     </style>
     <script>
         let allFound = false;
@@ -82,6 +96,8 @@
         let timerInterval;
         let ctrlPressed = false;
         let qPressed = false;
+        let participantName = '';
+        const requireName = {{ require_name|tojson }};
         
         function formatTime(seconds) {
             const mins = Math.floor(seconds / 60);
@@ -100,11 +116,27 @@
         }
         
         function toggleAttempt() {
+            if (requireName) {
+                const nameInput = document.getElementById('participant-name');
+                const nameError = document.getElementById('name-error');
+                
+                if (!nameInput.value.trim()) {
+                    nameError.style.display = 'block';
+                    return;
+                }
+                
+                nameError.style.display = 'none';
+                participantName = nameInput.value.trim();
+            }
+            
             fetch('/toggle_attempt', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
+                body: JSON.stringify({
+                    participant_name: participantName
+                })
             })
             .then(response => response.json())
             .then(data => {
@@ -114,16 +146,29 @@
                     document.getElementById('attempt-button').textContent = 'Остановить попытку';
                     document.getElementById('attempt-button').classList.add('stop');
                     
+                    // Скрываем поле ввода имени
+                    if (requireName) {
+                        document.getElementById('name-input-container').style.display = 'none';
+                    }
+                    
                     // Запускаем таймер
                     document.getElementById('timer').dataset.time = 0;
                     timerInterval = setInterval(updateTimer, 10);
                     
                     // Скрываем сообщение о завершении
                     document.getElementById('completion-message').style.display = 'none';
+                } else if (data.status === 'error') {
+                    alert(data.message);
                 } else {
                     attemptActive = false;
                     document.getElementById('attempt-button').textContent = 'Начать попытку';
                     document.getElementById('attempt-button').classList.remove('stop');
+                    
+                    // Показываем поле ввода имени
+                    if (requireName) {
+                        document.getElementById('name-input-container').style.display = 'block';
+                        document.getElementById('participant-name').value = '';
+                    }
                     
                     // Останавливаем таймер
                     clearInterval(timerInterval);
@@ -141,14 +186,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    console.log(data.message);
-                    // Воспроизводим звук для добавленного QR-кода
-                    // const audio = new Audio('/static/sound7.m4a');
-                    // audio.play().catch(e => console.log('Audio play error:', e));
-                } else {
-                    console.log(data.message);
-                }
+                console.log(data.message);
             })
             .catch(error => console.error('Error:', error));
         }
@@ -166,8 +204,11 @@
                         qrItem.className = 'qr-status';
                         
                         const statusText = document.createElement('span');
-                        // statusText.textContent = `QR ${index + 1}: ${status.found ? status.code : 'Не найден'}`;
-                        statusText.textContent = `QR ${index + 1}: ${status.found ? 'Найден' : 'Не найден'}`;
+                        if (status.found) {
+                            statusText.textContent = `QR ${index + 1}: Найден (${formatTime(status.detection_time)})`;
+                        } else {
+                            statusText.textContent = `QR ${index + 1}: Не найден`;
+                        }
                         
                         const statusIcon = document.createElement('span');
                         statusIcon.textContent = status.found ? '✓' : '✗';
@@ -212,6 +253,11 @@
                         clearInterval(timerInterval);
                         document.getElementById('attempt-button').textContent = 'Начать попытку';
                         document.getElementById('attempt-button').classList.remove('stop');
+                        
+                        // Показываем поле ввода имени
+                        if (requireName) {
+                            document.getElementById('name-input-container').style.display = 'block';
+                        }
                     }
                     
                     // Обновляем таймер с сервера, если попытка активна
@@ -229,7 +275,6 @@
                 ctrlPressed = true;
             } 
             else if (event.key === 'y' || event.key === 'Y' || event.key === 'н' || event.key === 'Н') {
-            // else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 qPressed = true;
             }
             
@@ -243,7 +288,6 @@
             if (event.key === 'Control') {
                 ctrlPressed = false;
             } 
-            // else if (event.key === 'ArrowRight' || event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'ArrowDown') {
             else if (event.key === 'y' || event.key === 'Y' || event.key === 'н' || event.key === 'Н') {
                 qPressed = false;
             }
@@ -256,17 +300,28 @@
         window.onload = function() {
             checkQR();
             document.getElementById('timer').dataset.time = 0;
+            
+            // Скрываем поле ввода имени, если попытка активна
+            if (attemptActive && requireName) {
+                document.getElementById('name-input-container').style.display = 'none';
+            }
         };
     </script>
 </head>
 <body>
     <h1>Детектор QR-кодов</h1>
     
+    <div id="name-input-container" class="name-input" style="{{ 'display: none;' if require_name else '' }}">
+        <label for="participant-name">Имя участника:</label>
+        <input type="text" id="participant-name">
+        <div id="name-error" class="name-error">Пожалуйста, введите имя участника</div>
+    </div>
+    
     <button id="attempt-button" class="control-button" onclick="toggleAttempt()">
         Начать попытку
     </button>
     
-    <div id="counter">Найдено: 0 из 6</div>
+    <div id="counter">Найдено: 0 из 5</div>
     <div id="qr-list">
         <!-- Здесь будут отображаться статусы QR-кодов -->
     </div>
@@ -275,6 +330,9 @@
     </div>
     
     <div id="timer" class="timer" data-time="0">00:00.000</div>
-    <!-- <div class="hotkey-info">Горячая клавиша: Ctrl+Q - добавить QR-код вручную</div> -->
+    
+    <!-- <div class="hotkey-info">
+        Горячие клавиши: Ctrl+Y - добавить QR-код вручную
+    </div> -->
 </body>
 </html>
