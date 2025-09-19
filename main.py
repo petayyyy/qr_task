@@ -6,7 +6,8 @@ from queue import Queue
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
-from pyzbar import pyzbar
+# from pyzbar import pyzbar
+from pyzbar.pyzbar import decode, ZBarSymbol
 import csv
 import os
 from datetime import datetime
@@ -74,9 +75,10 @@ def save_to_csv(filename: str):
             
             # Добавляем времена обнаружения QR-кодов
             for i in range(max_qrs):
-                if i < len(qr_detection_times):
-                    if (i != 0): row_data[f'qr_{i+1}_time'] = format_number(qr_detection_times[i] - qr_detection_times[i-1])
-                    else: row_data[f'qr_{i+1}_time'] = format_number(qr_detection_times[i])
+                if i < len(qr_detection_times) - 1:
+                    row_data[f'qr_{i+1}_time'] = format_number(qr_detection_times[i])
+                elif i < len(qr_detection_times):
+                    row_data[f'qr_{i+1}_time'] = format_number(attempt_duration)
                 else:
                     row_data[f'qr_{i+1}_time'] = ''
             
@@ -105,7 +107,7 @@ def setEnd():
         rospy.sleep(1)
 
 def setQr(qr_data:str):
-    global detection_active, ros_initialized, found_qrs, attempt_active, all_found_flag, qr_detection_times, attempt_start_time
+    global detection_active, ros_initialized, found_qrs, attempt_active, all_found_flag, qr_detection_times, attempt_start_time, users_file_name
     
     # Добавляем только новые уникальные QR-коды
     if ("MANUAL_QR" in qr_data or (qr_data not in found_qrs)) and len(found_qrs) < max_qrs:
@@ -124,6 +126,10 @@ def setQr(qr_data:str):
             qr_detection_times.append(detection_time)
             print("Все QR-коды найдены!")
             all_found_flag = True
+            # Автоматически останавливаем попытку
+            attempt_active = False
+            # Сохраняем результаты
+            save_to_csv(users_file_name)
             qr_queue.put("ALL_FOUND")
             led_thread2 = threading.Thread(target=setEnd)
             led_thread2.daemon = True
@@ -136,7 +142,7 @@ def image_callback(data):
     
     try:
         img = bridge.imgmsg_to_cv2(data, 'bgr8')
-        barcodes = pyzbar.decode(img)
+        barcodes = decode(img, symbols=[ZBarSymbol.QRCODE])
         
         if barcodes:
             for barcode in barcodes:
@@ -166,7 +172,8 @@ def reset_attempt():
     all_found_flag = False
     manual_qr_counter = 0
     qr_detection_times = []
-   
+    # participant_name = ""
+
     print("Попытка сброшена")
 
 @app.route('/')
@@ -180,7 +187,7 @@ def qr_checker():
 @app.route('/qr_status')
 def qr_status():
     """Проверяет наличие новых QR-кодов в очереди и возвращает статус"""
-    global attempt_duration, attempt_start_time, qr_detection_times
+    global attempt_duration, attempt_start_time, qr_detection_times, attempt_active, all_found_flag
     
     qr_codes = []
     all_found = False
@@ -195,13 +202,25 @@ def qr_status():
             item = qr_queue.get_nowait()
             if item == "ALL_FOUND":
                 all_found = True
+                # Автоматически останавливаем попытку при нахождении всех QR-кодов
+                if attempt_active:
+                    attempt_active = False
+                    # Сохраняем результаты
+                    save_to_csv(users_file_name)
             else:
                 qr_codes.append(item)
         except:
             break
-    if (len(qr_codes) >= max_qrs):
+    
+    # Если все QR-коды найдены, устанавливаем флаг
+    if len(found_qrs) >= max_qrs:
         all_found = True
-        
+        # Автоматически останавливаем попытку при нахождении всех QR-кодов
+        if attempt_active:
+            attempt_active = False
+            # Сохраняем результаты
+            save_to_csv(users_file_name)
+    
     # Создаем список статусов для каждого QR-кода
     qr_statuses = []
     for i in range(max_qrs):
@@ -242,6 +261,7 @@ def toggle_attempt():
             if not name:
                 return jsonify({'status': 'error', 'message': 'Не указано имя участника'})
             participant_name = name  # Устанавливаем имя до сброса
+            # print(f"Имя участника {name}")
         
         # Начинаем новую попытку (сбрасываем всё, кроме имени)
         reset_attempt()  # Внутри reset_attempt() больше не сбрасывает participant_name
@@ -299,6 +319,12 @@ def manual_add_qr():
     setQr(qr_data=qr_data)
 
     return jsonify({'status': 'success', 'message': f'Добавлен QR-код: {qr_data}'})
+
+@app.route('/reset_attempt', methods=['POST'])
+def reset_attempt_endpoint():
+    """Полный сброс состояния для нового цикла"""
+    reset_attempt()
+    return jsonify({'status': 'success', 'message': 'Состояние сброшено'})
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):

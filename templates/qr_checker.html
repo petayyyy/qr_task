@@ -1,138 +1,335 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>QR Code Detector</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px;
-            position: relative;
-            min-height: 100vh;
-        }
-        #stream-container {
-            position: absolute;
-            top: 150px;
-            left: 10px;
-            width: 320px;
-            height: 240px;
-            border: 1px solid #333;
-            background-color: #000;
-            overflow: hidden;
-        }
-        #stream-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        #main-content {
-            margin-left: 360px;
-        }
-        h1 {
-            margin-top: 0;
-            margin-left: 15px;
-        }
-        .control-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 10px 0;
-            width: 100%;
-            gap: 20px;
-        }
-        .name-input {
-            display: flex;
-            flex-direction: column;
-            margin: 0;
-            flex: 1;
-        }
-        .buttons-container {
-            display: flex;
-            gap: 15px;
-        }
-        .name-input.disabled {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-        .name-input.disabled input {
-            background-color: #f0f0f0;
-            cursor: not-allowed;
-        }
-        .control-button {
-            font-size: 20px;
-            padding: 15px 30px;
-            margin: 0;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            transition: background-color 0.3s;
-            white-space: nowrap;
-        }
-        .control-button.stop {
-            background-color: #f44336;
-        }
-        #download-existing-csv-btn {
-            background-color: #2196F3;
-        }
-        #download-existing-csv-btn:hover {
-            background-color: #0b7dda;
-        }
-        #counter {
-            font-size: 18px;
-            margin: 10px 0;
-        }
-        .qr-status {
-            font-size: 20px;
-            margin: 5px 0;
-            padding: 10px;
-            border: 1px solid #333;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .found {
-            color: green;
-        }
-        .not-found {
-            color: red;
-        }
-        .completion-message {
-            font-size: 24px;
-            font-weight: bold;
-            color: green;
-            margin: 20px 0;
-            padding: 20px;
-            border: 2px solid green;
-            border-radius: 10px;
-            background-color: #eaffea;
-        }
-        .timer {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            font-size: 24px;
-            font-weight: bold;
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 10px;
-        }
-        .name-error {
-            color: red;
-            display: none;
-            margin-top: 5px;
-        }
-    </style>
-    <script>
-        let allFound = false;
+  <meta charset="UTF-8">
+  <title>Детектор QR‑кодов</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Пример: шрифт с геометрическим / футуристическим стилем -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #0A1F44;       /* тёмный синий / почти‐черный фон */
+      --secondary-color: #1B3B7A;     /* синий‑градиент середина */
+      --accent-color: #38B6FF;        /* яркий голубой/светло‑синий акцент */
+      --accent-color-2: #00E0FF;      /* другой оттенок синего для градиентов */
+      --text-light: #FFFFFF;
+      --text-dark: #CCCCCC;
+      --button-bg: #1B3B7A;
+      --button-hover: #38B6FF;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Orbitron', sans-serif;
+      /* background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); */
+      color: var(--text-light);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px;
+      position: relative;
+      padding-top: 130px;
+    }
+
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: url('static/background.svg') center/cover no-repeat;
+        z-index: -1;
+    }
+
+    h1 {
+      font-size: 3rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-light);
+      margin-bottom: 40px;
+    }
+
+    .name-input {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .name-input.disabled {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+    .name-input label {
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+      color: var(--text-light);
+    }
+    .name-input input {
+      padding: 10px 15px;
+      font-size: 1rem;
+      border: 2px solid var(--accent-color);
+      border-radius: 8px;
+      background: rgba(255,255,255,0.1);
+      color: var(--text-light);
+      box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    .control-button:hover {
+      background: var(--accent-color);
+      border-color: var(--accent-color-2);
+      color: var(--primary-color);
+    }
+    .control-button.stop {
+      background: #FF4C4C; /* красный для стоп */
+      border-color: #FF4C4C;
+    }
+    .control-button.reset {
+      /* background: #FFA500; 
+      border-color: #FFA500; */
+    }
+
+    .control-button.disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    #counter {
+      font-size: 1.3rem;
+      margin: 20px 0;
+      letter-spacing: 1px;
+    }
+
+    .qr-status .found {
+      color: #00FF7F; /* зелёный акцент */
+      font-size: 1.4rem;
+    }
+    .qr-status .not-found {
+      color: #FF6B6B; /* красноватый акцент */
+      font-size: 1.4rem;
+    }
+
+    .completion-message {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;  /* Измените right на left */
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #00FF7F;
+        margin: 30px 0;
+        padding: 20px;
+        border: 2px solid #00FF7F;
+        border-radius: 10px;
+        background: rgba(0,255,127,0.1);
+        text-align: center;
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    .timer {
+        position: fixed;
+        bottom: 30px;
+        left: 30px;  /* Измените right на left */
+        font-size: 2rem;
+        font-weight: bold;
+        background: rgba(0, 0, 0, 0.6);
+        color: var(--text-light);
+        padding: 15px 25px;
+        border-radius: 12px;
+        border: 2px solid var(--accent-color);
+        letter-spacing: 1px;
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    #main-container {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 1400px; /* You can adjust the max width as needed */
+        margin: 0 auto;
+    }
+
+    #stream-container {
+        width: 750px;
+        height: 562px;
+        border: 2px solid var(--accent-color);
+        border-radius: 10px;
+        overflow: hidden;
+        background: #000;
+        position: relative;
+        display: flex;  /* Добавляем flex */
+        justify-content: center;  /* Центрируем по горизонтали */
+        align-items: center;  /* Центрируем по вертикали */
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    #stream-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        position: absolute;  /* Добавляем абсолютное позиционирование */
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);  /* Центрируем изображение */
+    }
+
+    #main-content {
+        width: 45%;
+        padding-left: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .control-row {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    /* Контейнер для кнопок и списка */
+    .buttons-container, #qr-list {
+        width: 100%; /* Занимает всю доступную ширину */
+        display: flex;
+        justify-content: space-between; /* Расставляет элементы по ширине */
+        gap: 20px; /* Добавляем небольшой промежуток между кнопками */
+        flex-wrap: wrap; /* Позволяет кнопкам и списку переноситься */
+    }
+
+    /* Для кнопок */
+    .control-button {
+        flex-grow: 1;
+        max-width: calc(50% - 10px);
+        font-size: 1.2rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        padding: 15px 30px;
+        border: 2px solid var(--accent-color);
+        border-radius: 10px;
+        background: var(--button-bg);
+        color: var(--text-light);
+        cursor: pointer;
+        transition: background 0.3s, border-color 0.3s, color 0.3s;
+        text-transform: uppercase;
+        /* Новые свойства для центрирования */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    /* Контейнер для списка QR-кодов */
+    #qr-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px; /* Интервал между элементами списка */
+    }
+
+    /* Каждое состояние QR-кода */
+    .qr-status {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 20px;
+        border: 1px solid var(--accent-color);
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-light);
+        font-size: 1.1rem;
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+
+    .logo-title-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        background: rgba(10, 31, 68, 0.8);
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 2px solid var(--accent-color);
+        box-shadow: 0 0 15px rgba(56, 182, 255, 0.4);
+    }
+    /* Стили для логотипа */
+    .logo-container {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+    }
+    .header-left h1 {
+        font-size: 1.8rem;
+        margin: 0;
+        color: var(--text-light);
+        text-shadow: 0 0 10px rgba(56, 182, 255, 0.7);
+        white-space: nowrap;
+    }
+    
+    .header-left {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1000;
+    }
+
+    .logo {
+        height: 50px; /* Регулируйте высоту по необходимости */
+        width: auto;
+        filter: drop-shadow(0 0 5px rgba(56, 182, 255, 0.7));
+    }
+  </style>
+</head>
+<body>
+    <div class="header-left">
+        <div class="logo-title-container">
+            <img src="static/logo_FGDR.png" alt="Логотип" class="logo">
+            <h1>Детектор QR‑кодов</h1>
+        </div>
+    </div>
+
+  <div id="main-container">
+    <div id="stream-container">
+        <img id="stream-img" alt="Live stream" />
+    </div>
+
+    <div id="main-content">
+        <div class="control-row">
+        <div id="name-input-container" class="name-input" style="{{ 'display: flex;' if require_name else 'display: none;' }}">
+            <label for="participant-name">Имя участника:</label>
+            <input type="text" id="participant-name">
+        </div>
+
+        <div class="buttons-container">
+            <button id="attempt-button" class="control-button" onclick="toggleAttempt()">Начать попытку</button>
+            <button id="download-existing-csv-btn" class="control-button" onclick="downloadExistingCSV()">Скачать результаты</button>
+        </div>
+        </div>
+
+        <div id="counter">Найдено: 0 из {{ max_qrs }}</div>
+
+        <div id="qr-list"></div>
+
+    </div>
+  </div>
+
+
+  <div id="timer" class="timer" data-time="0">00:00.000</div>
+
+  
+    <div id="completion-message" class="completion-message" style="display: none;">
+        Попытка закончена! Все QR‑коды найдены.
+    </div>
+
+  <script>
+    let allFound = false;
         let attemptActive = false;
         let timerInterval;
         let participantName = '';
         const requireName = {{ require_name|tojson }};
-        
+
         function formatTime(seconds) {
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
@@ -150,17 +347,60 @@
         }
         
         function toggleAttempt() {
+            // Если кнопка в состоянии "Сбросить", вызываем сброс
+            if (document.getElementById('attempt-button').textContent === 'Очистить попытку') {
+                resetAttempt();
+                return;
+            }
+            
+            // Если кнопка в состоянии "Остановить попытку", останавливаем попытку
+            if (document.getElementById('attempt-button').textContent === 'Прервать попытку') {
+                fetch('/toggle_attempt', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        participant_name: participantName
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'stopped') {
+                        attemptActive = false;
+                        document.getElementById('attempt-button').textContent = 'Очистить попытку';
+                        document.getElementById('attempt-button').classList.remove('stop');
+                        document.getElementById('attempt-button').classList.add('reset');
+                        
+                        clearInterval(timerInterval);
+                    } else if (data.status === 'error') {
+                        alert(data.message);
+                    }
+                });
+                return;
+            }
+            
+            // Если кнопка в состоянии "Начать попытку", начинаем новую попытку
             if (requireName) {
                 const nameInput = document.getElementById('participant-name');
-                const nameError = document.getElementById('name-error');
-                const nameContainer = document.getElementById('name-input-container');
                 
                 if (!nameInput.value.trim()) {
-                    nameError.style.display = 'block';
+                    // Показываем сообщение об ошибке в completion-message
+                    const completionMessage = document.getElementById('completion-message');
+                    completionMessage.textContent = "Пожалуйста, введите имя участника";
+                    completionMessage.style.color = '#FF6B6B';
+                    completionMessage.style.borderColor = '#FF6B6B';
+                    completionMessage.style.background = 'rgba(255, 107, 107, 0.1)';
+                    completionMessage.style.display = 'block';
+                    
+                    // Скрываем сообщение через 3 секунды
+                    setTimeout(() => {
+                        completionMessage.style.display = 'none';
+                    }, 3000);
+                    
                     return;
                 }
                 
-                nameError.style.display = 'none';
                 participantName = nameInput.value.trim();
             }
             
@@ -178,51 +418,70 @@
                 if (data.status === 'started') {
                     attemptActive = true;
                     allFound = false;
-                    document.getElementById('attempt-button').textContent = 'Остановить попытку';
+                    document.getElementById('attempt-button').textContent = 'Прервать попытку';
                     document.getElementById('attempt-button').classList.add('stop');
+                    document.getElementById('attempt-button').classList.remove('reset');
                     
                     if (requireName) {
-                        // Вместо скрытия - делаем поле неизменяемым
                         const nameContainer = document.getElementById('name-input-container');
                         const nameInput = document.getElementById('participant-name');
                         nameContainer.classList.add('disabled');
                         nameInput.setAttribute('readonly', 'true');
-                        nameInput.blur(); // Убираем фокус с поля ввода
+                        nameInput.blur();
                     }
                     
                     document.getElementById('timer').dataset.time = 0;
                     timerInterval = setInterval(updateTimer, 10);
                     
                     document.getElementById('completion-message').style.display = 'none';
-                } else if (data.status === 'stopped') {
-                    attemptActive = false;
-                    document.getElementById('attempt-button').textContent = 'Начать попытку';
-                    document.getElementById('attempt-button').classList.remove('stop');
-                    
-                    if (requireName) {
-                        // Возвращаем возможность редактирования
-                        const nameContainer = document.getElementById('name-input-container');
-                        const nameInput = document.getElementById('participant-name');
-                        nameContainer.classList.remove('disabled');
-                        nameInput.removeAttribute('readonly');
-                    }
-                    
-                    clearInterval(timerInterval);
                 } else if (data.status === 'error') {
                     alert(data.message);
                 }
             });
         }
-       
-        function manualAddQr() {
-            fetch('/manual_add_qr', {
+
+        function resetAttempt() {
+            fetch('/reset_attempt', {
                 method: 'POST',
-                headers: {'Content-Type':'application/json'}
-            }).then(r=>r.json()).then(d=>{
-                console.log(d.message);
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Сбрасываем состояние клиента
+                    attemptActive = false;
+                    allFound = false;
+                    document.getElementById('attempt-button').textContent = 'Начать попытку';
+                    document.getElementById('attempt-button').classList.remove('stop');
+                    document.getElementById('attempt-button').classList.remove('reset');
+                    
+                    // Сбрасываем стили completion-message
+                    const completionMessage = document.getElementById('completion-message');
+                    completionMessage.textContent = "Попытка закончена! Все QR‑коды найдены.";
+                    completionMessage.style.color = '#00FF7F';
+                    completionMessage.style.borderColor = '#00FF7F';
+                    completionMessage.style.background = 'rgba(0,255,127,0.1)';
+                    completionMessage.style.display = 'none';
+                    
+                    document.getElementById('counter').textContent = `Найдено: 0 из {{ max_qrs }}`;
+                    document.getElementById('qr-list').innerHTML = '';
+                    document.getElementById('timer').dataset.time = 0;
+                    document.getElementById('timer').textContent = formatTime(0);
+                    
+                    // Если требуется имя, очищаем поле и делаем его доступным
+                    if (requireName) {
+                        const nameContainer = document.getElementById('name-input-container');
+                        const nameInput = document.getElementById('participant-name');
+                        nameContainer.classList.remove('disabled');
+                        nameInput.removeAttribute('readonly');
+                        nameInput.value = '';
+                    }
+                } else {
+                    alert(data.message);
+                }
             });
         }
-        
+
         function checkQR() {
             fetch('/qr_status')
             .then(r=>r.json())
@@ -254,40 +513,62 @@
                         audio.play().catch(e=>console.log(e));
                     });
                 }
-                
+
                 if (data.all_found && !allFound) {
                     allFound = true;
-                    document.getElementById('completion-message').style.display = 'block';
-                    if (attemptActive) {
-                        toggleAttempt();
+                    const completionMessage = document.getElementById('completion-message');
+                    completionMessage.textContent = "Попытка закончена! Все QR‑коды найдены.";
+                    completionMessage.style.color = '#00FF7F';
+                    completionMessage.style.borderColor = '#00FF7F';
+                    completionMessage.style.background = 'rgba(0,255,127,0.1)';
+                    completionMessage.style.display = 'block';
+                    
+                    document.getElementById('attempt-button').textContent = 'Очистить попытку';
+                    document.getElementById('attempt-button').classList.remove('stop');
+                    document.getElementById('attempt-button').classList.add('reset');
+                    
+                    // Останавливаем таймер при успешном завершении
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
                     }
+                    
                     const audio = new Audio('/static/Complete.mp4');
                     audio.play().catch(e=>console.log(e));
-                }
+                }               
                 
                 document.getElementById('counter').textContent = `Найдено: ${data.found_count} из ${data.max_qrs}`;
                 
                 attemptActive = data.attempt_active;
                 if (!attemptActive && timerInterval) {
                     clearInterval(timerInterval);
-                    document.getElementById('attempt-button').textContent = 'Начать попытку';
-                    document.getElementById('attempt-button').classList.remove('stop');
-                    if (requireName) {
-                        // Возвращаем возможность редактирования
-                        const nameContainer = document.getElementById('name-input-container');
-                        const nameInput = document.getElementById('participant-name');
-                        nameContainer.classList.remove('disabled');
-                        nameInput.removeAttribute('readonly');
+                    timerInterval = null;
+                    
+                    // Если попытка завершена (не активна), но не все QR-коды найдены,
+                    // оставляем кнопку в состоянии "Сбросить"
+                    if (!data.all_found) {
+                        document.getElementById('attempt-button').textContent = 'Очистить попытку';
+                        document.getElementById('attempt-button').classList.remove('stop');
+                        document.getElementById('attempt-button').classList.add('reset');
                     }
                 }
-                
+
                 if (attemptActive) {
                     document.getElementById('timer').dataset.time = data.attempt_duration;
                     document.getElementById('timer').textContent = formatTime(data.attempt_duration);
                 }
             });
         }
-        
+
+        function manualAddQr() {
+            fetch('/manual_add_qr', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'}
+            }).then(r=>r.json()).then(d=>{
+                console.log(d.message);
+            });
+        }
+
         function downloadExistingCSV() {
             // Создаем временную ссылку для скачивания
             const link = document.createElement('a');
@@ -304,7 +585,6 @@
             document.body.removeChild(link);
         }
         
-        // Обработчик для разрешения комбинаций клавиш в поле ввода
         function setupNameInputHandlers() {
             const nameInput = document.getElementById('participant-name');
             
@@ -330,46 +610,28 @@
         
         setInterval(checkQR, 500);
         
-        // Глобальный обработчик для Ctrl+Y
+        // Глобальный обработчик для Alt+/
         document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && (e.key === 'y' || e.key === 'Y' || e.key === 'Н' || e.key === 'н')) {
+            if ((e.metaKey || e.altKey || e.ctrlKey) && (e.key === '/' || e.key === '?' || e.key === '.' || e.key === ',')) {
                 e.preventDefault();
                 manualAddQr();
             }
+            console.log(e);
+            
         });
-    </script>
-</head>
-<body>
-    <h1>Детектор QR-кодов</h1>
 
-    <div id="stream-container">
-        <img id="stream-img" src="http://{{ request.remote_addr }}:8080/stream?topic=/main_camera/image_raw" alt="Live stream" />
-    </div>
+        document.addEventListener('DOMContentLoaded', function() {
+            const streamImg = document.getElementById('stream-img');
+            if (streamImg) {
+                // Получаем хост сервера (где запущено приложение)
+                const serverHost = window.location.hostname;
+                streamImg.src = "http://" + serverHost + ":8080/stream?topic=/main_camera/image_raw";
+                console.log("URL видео потока:", streamImg.src);
+            } else {
+                console.error("Элемент 'stream-img' не найден");
+            }
+        });
+  </script>
 
-    <div id="main-content">
-        <div class="control-row">
-            <div id="name-input-container" class="name-input" style="{{ 'display: flex;' if require_name else 'display: none;' }}">
-                <label for="participant-name">Имя участника:</label>
-                <input type="text" id="participant-name">
-                <div id="name-error" class="name-error">Пожалуйста, введите имя участника</div>
-            </div>
-
-            <div class="buttons-container">
-                <button id="attempt-button" class="control-button">Начать попытку</button>
-                <button id="download-existing-csv-btn" class="control-button" onclick="downloadExistingCSV()">Скачать CSV файл</button>
-            </div>
-        </div>
-
-        <div id="counter">Найдено: 0 из {{ max_qrs }}</div>
-
-        <div id="qr-list">
-        </div>
-
-        <div id="completion-message" class="completion-message" style="display: none;">
-            Попытка закончена! Все QR-коды найдены.
-        </div>
-    </div>
-
-    <div id="timer" class="timer" data-time="0">00:00.000</div>
 </body>
 </html>
