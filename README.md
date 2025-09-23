@@ -25,7 +25,7 @@ python3 main_no_ros.py
 ## Запуск launch файла  
 Для запуска необходимо скопировать пакет в рабочию дирректорию Ros.  
 ```bash
-cp qr_checker ~/catkin_ws/src/
+cp -r qr_checker ~/catkin_ws/src/
 ```  
 Или скачать пакет с git.  
 ```bash
@@ -54,10 +54,10 @@ roslaunch qr_checker qr_checker.launch
 - **Пример использования**:
   ```bash
   # Для короткой сессии
-  roslaunch qr_detector qr_detector.launch max_qrs:=3
+  roslaunch qr_checker qr_checker.launch max_qrs:=3
   
   # Для расширенной сессии
-  roslaunch qr_detector qr_detector.launch max_qrs:=10
+  roslaunch qr_checker qr_checker.launch max_qrs:=10
   ```
 ### 🎨 `led` - Световые уведомления
 - **Тип**: `boolean` (`true`/`false`)
@@ -69,10 +69,10 @@ roslaunch qr_checker qr_checker.launch
 - **Пример использования**:
   ```bash
   # С индикацией (по умолчанию)
-  roslaunch qr_detector qr_detector.launch led:=true
+  roslaunch qr_checker qr_checker.launch led:=true
   
   # Тихий режим (для тестирования)
-  roslaunch qr_detector qr_detector.launch led:=false
+  roslaunch qr_checker qr_checker.launch led:=false
   ```
 ### 📷 `camera_topic` - Топик камеры для захвата изображений  
 - **Тип**: `string`  
@@ -85,10 +85,10 @@ roslaunch qr_checker qr_checker.launch
 - **Пример использования**:  
   ```bash  
   # Использование камеры по умолчанию  
-  roslaunch qr_detector qr_detector.launch camera_topic:="main_camera/image_raw"  
+  roslaunch qr_checker qr_checker.launch camera_topic:="main_camera/image_raw"  
 
   # Использование изобращения с камеры с уменьшенной частотой   
-  roslaunch qr_detector qr_detector.launch camera_topic:="/main_camera/image_raw_throttled"  
+  roslaunch qr_checker qr_checker.launch camera_topic:="/main_camera/image_raw_throttled"  
   ```  
 ### 🌐 `port` - Порт веб-сервера
 - **Тип**: `integer`
@@ -101,10 +101,10 @@ roslaunch qr_checker qr_checker.launch
 - **Пример использования**:
   ```bash
   # Стандартный порт
-  roslaunch qr_detector qr_detector.launch port:=5000
+  roslaunch qr_checker qr_checker.launch port:=5000
   
   # Альтернативный порт (если 5000 занят)
-  roslaunch qr_detector qr_detector.launch port:=8080
+  roslaunch qr_checker qr_checker.launch port:=8080
   ```
 ### 👤 `isNeedName` - Имя участника
 - **Тип**: `boolean` (`true`/`false`)
@@ -116,10 +116,10 @@ roslaunch qr_checker qr_checker.launch
 - **Пример использования**:
   ```bash
   # С запросом имени (для соревнований)
-  roslaunch qr_detector qr_detector.launch isNeedName:=true
+  roslaunch qr_checker qr_checker.launch isNeedName:=true
   
   # Без имени (для тестирования/демо)
-  roslaunch qr_detector qr_detector.launch isNeedName:=false
+  roslaunch qr_checker qr_checker.launch isNeedName:=false
   ```
 ## 🌐 Доступ к веб-интерфейсу
 После запуска система доступна по следующим адресам:
