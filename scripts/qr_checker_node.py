@@ -52,8 +52,8 @@ manual_qr_counter = 0
 isFirstAtt = True
 port_server = 5000
 
-# Новые переменные для имени участника и времени обнаружения
-require_name = True
+# Parameters for savig into file
+isNeedName = True
 participant_name = ""
 qr_detection_times = []
 users_file_name = os.path.join(package_path, 'qr_results.csv')
@@ -73,8 +73,12 @@ def format_number(number):
 
 def save_to_csv(filename: str):
     """Сохраняет результаты попытки в CSV файл"""
-    global participant_name, qr_detection_times, attempt_duration, isFirstAtt
-    if not participant_name:
+    global participant_name, qr_detection_times, attempt_duration, isFirstAtt, isNeedName
+    
+    if not isNeedName:
+        participant_name = ""
+    
+    if isNeedName and not participant_name:
         rospy.logwarn("No participant name, skipping CSV save")
         return
     
@@ -93,7 +97,7 @@ def save_to_csv(filename: str):
             
             row_data = {
                 'timestamp': datetime.now().strftime("%d/%m/%y %H:%M"),
-                'participant': participant_name,
+                'participant': participant_name if isNeedName else "",
                 'completion_time': format_number(attempt_duration)
             }
             
@@ -181,7 +185,7 @@ def image_callback(data):
         rospy.logerr(f"Ошибка обработки изображения: {e}")
 
 def init_ros():
-    global image_sub, ros_initialized, max_qrs, port_server, isLed
+    global image_sub, ros_initialized, max_qrs, port_server, isLed, isNeedName
     try:
         rospy.init_node('qr_checker', anonymous=True)
 
@@ -210,19 +214,16 @@ def reset_attempt():
 
     rospy.loginfo("Попытка сброшена")
 
-# Flask routes (остаются без изменений, как в вашем оригинальном коде)
 @app.route('/')
 def index():
     return redirect('/qr_checker')
 
 @app.route('/qr_checker')
 def qr_checker():
-    return render_template('qr_checker.html', require_name=require_name)
+    return render_template('qr_checker.html', isNeedName=isNeedName)
 
 @app.route('/qr_status')
 def qr_status():
-    # ... (остальной код маршрутов остается точно таким же, как в вашем оригинале)
-    # Полный код маршрутов Flask
     global attempt_duration, attempt_start_time, qr_detection_times, attempt_active, all_found_flag
     
     qr_codes = []
@@ -279,21 +280,23 @@ def qr_status():
 
 @app.route('/toggle_attempt', methods=['POST'])
 def toggle_attempt():
-    global attempt_active, attempt_start_time, attempt_duration, all_found_flag, participant_name, qr_detection_times, users_file_name
+    global attempt_active, attempt_start_time, attempt_duration, all_found_flag, participant_name, qr_detection_times, users_file_name, isNeedName
     
     if not attempt_active:
-        if require_name:
+        if isNeedName:
             name = request.json.get('participant_name', '') if request.json else ''
             if not name:
                 return jsonify({'status': 'error', 'message': 'Не указано имя участника'})
             participant_name = name
+        else:
+            participant_name = ""
         
         reset_attempt()
         attempt_active = True
         attempt_start_time = time.time()
         attempt_duration = 0
         qr_detection_times = []
-        rospy.loginfo(f"Попытка начата для участника: {participant_name}")
+        rospy.loginfo(f"Попытка начата для участника: {participant_name if isNeedName else 'Без имени'}")
         return jsonify({'status': 'started', 'message': 'Попытка начата'})
     else:
         attempt_active = False

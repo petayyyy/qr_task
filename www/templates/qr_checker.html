@@ -297,7 +297,7 @@
 
     <div id="main-content">
         <div class="control-row">
-        <div id="name-input-container" class="name-input" style="{{ 'display: flex;' if require_name else 'display: none;' }}">
+        <div id="name-input-container" class="name-input" style="{{ 'display: flex;' if isNeedName else 'display: none;' }}">
             <label for="participant-name">Имя участника:</label>
             <input type="text" id="participant-name">
         </div>
@@ -328,7 +328,7 @@
         let attemptActive = false;
         let timerInterval;
         let participantName = '';
-        const requireName = {{ require_name|tojson }};
+        const isNeedName = {{ isNeedName|tojson }};
 
         function formatTime(seconds) {
             const mins = Math.floor(seconds / 60);
@@ -381,7 +381,7 @@
             }
             
             // Если кнопка в состоянии "Начать попытку", начинаем новую попытку
-            if (requireName) {
+            if (isNeedName) {
                 const nameInput = document.getElementById('participant-name');
                 
                 if (!nameInput.value.trim()) {
@@ -402,6 +402,8 @@
                 }
                 
                 participantName = nameInput.value.trim();
+            } else {
+                participantName = "";
             }
             
             fetch('/toggle_attempt', {
@@ -422,7 +424,7 @@
                     document.getElementById('attempt-button').classList.add('stop');
                     document.getElementById('attempt-button').classList.remove('reset');
                     
-                    if (requireName) {
+                    if (isNeedName) {
                         const nameContainer = document.getElementById('name-input-container');
                         const nameInput = document.getElementById('participant-name');
                         nameContainer.classList.add('disabled');
@@ -469,7 +471,7 @@
                     document.getElementById('timer').textContent = formatTime(0);
                     
                     // Если требуется имя, очищаем поле и делаем его доступным
-                    if (requireName) {
+                    if (isNeedName) {
                         const nameContainer = document.getElementById('name-input-container');
                         const nameInput = document.getElementById('participant-name');
                         nameContainer.classList.remove('disabled');
