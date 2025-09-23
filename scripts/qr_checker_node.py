@@ -1,4 +1,7 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
+import rospkg
 from flask import Flask, render_template, jsonify, request, send_file, redirect
 import time
 import threading
@@ -6,40 +9,62 @@ from queue import Queue
 import rospy
 from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
-# from pyzbar import pyzbar
 from pyzbar.pyzbar import decode, ZBarSymbol
 import csv
-import os
+import logging
 from datetime import datetime
-from clover.srv import SetLEDEffect
+
+# Try to import Clover service (if available)
+try:
+    from clover.srv import SetLEDEffect
+except ImportError:
+    rospy.logwarn("Clover package not available - LED effects disabled")
 
 app = Flask(__name__)
+
+# Get package path
+rospack = rospkg.RosPack()
+package_path = rospack.get_path('qr_checker')
+www_path = os.path.join(package_path, 'www')
+
+# Configure Flask template and static folders
+app = Flask(__name__, 
+            template_folder=os.path.join(www_path, 'templates'),
+            static_folder=os.path.join(www_path, 'static'))
+
 bridge = CvBridge()
-import logging
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
+
+# Disable Flask logging
+# log = logging.getLogger('werkzeug')
+# log.setLevel(logging.ERROR)
 
 # Глобальные переменные для хранения статуса и результатов
 qr_queue = Queue()
 detection_active = True
 ros_initialized = False
-found_qrs = set()  # Множество для хранения уникальных QR-кодов
-max_qrs = 5        # Максимальное количество QR-кодов для обнаружения
-attempt_active = False  # Флаг активности попытки
-attempt_start_time = 0  # Время начала попытки
-attempt_duration = 0    # Длительность попытки
-all_found_flag = False  # Флаг, что все QR-коды найдены
-manual_qr_counter = 0   # Счётчик для ручного добавления QR-кодов
+found_qrs = set()
+max_qrs = 5
+attempt_active = False
+attempt_start_time = 0
+attempt_duration = 0
+all_found_flag = False
+manual_qr_counter = 0
 isFirstAtt = True
+port_server = 5000
 
 # Новые переменные для имени участника и времени обнаружения
-require_name = True  # Флаг обязательности ввода имени
-participant_name = ""  # Имя текущего участника
-qr_detection_times = []  # Времена обнаружения QR-кодов
-users_file_name = 'qr_results.csv'
-# out systems
-isLed = True
-set_effect = rospy.ServiceProxy('led/set_effect', SetLEDEffect)  # define proxy to ROS-service
+require_name = True
+participant_name = ""
+qr_detection_times = []
+users_file_name = os.path.join(package_path, 'qr_results.csv')
+
+# LED system
+isLed = False
+try:
+    set_effect = rospy.ServiceProxy('led/set_effect', SetLEDEffect)
+except rospy.ROSException as e:
+    rospy.logerr(f"Failed to create LED service proxy: {e}")
+    isLed = False
 
 def format_number(number):
     if isinstance(number, (int, float)):
@@ -50,7 +75,7 @@ def save_to_csv(filename: str):
     """Сохраняет результаты попытки в CSV файл"""
     global participant_name, qr_detection_times, attempt_duration, isFirstAtt
     if not participant_name:
-        print("No participant name, skipping CSV save")
+        rospy.logwarn("No participant name, skipping CSV save")
         return
     
     file_exists = os.path.isfile(filename)
@@ -66,14 +91,12 @@ def save_to_csv(filename: str):
             if not file_exists:
                 writer.writeheader()
             
-            # Формируем данные для записи
             row_data = {
                 'timestamp': datetime.now().strftime("%d/%m/%y %H:%M"),
                 'participant': participant_name,
                 'completion_time': format_number(attempt_duration)
             }
             
-            # Добавляем времена обнаружения QR-кодов
             for i in range(max_qrs):
                 if i < len(qr_detection_times) - 1:
                     row_data[f'qr_{i+1}_time'] = format_number(qr_detection_times[i])
@@ -83,52 +106,58 @@ def save_to_csv(filename: str):
                     row_data[f'qr_{i+1}_time'] = ''
             
             writer.writerow(row_data)
-        print(f"Данные сохранены в файл: {filename}")
-        print("#=================================================================#")
+        rospy.loginfo(f"Данные сохранены в файл: {filename}")
     except Exception as e:
-        print(f"Error saving to CSV: {e}")
+        rospy.logerr(f"Error saving to CSV: {e}")
 
 def setFound():
     global isLed
-    if (not isLed): return
-    set_effect(effect='blink', r=0, g=255, b=0)
-    rospy.sleep(3)
-    set_effect(r=0, g=0, b=0)
+    if not isLed: 
+        return
+    try:
+        set_effect(effect='blink', r=0, g=255, b=0)
+        rospy.sleep(3)
+        set_effect(r=0, g=0, b=0)
+    except rospy.ServiceException as e:
+        rospy.logwarn(f"LED service error: {e}")
 
 def setEnd():
     global isLed
-    if (not isLed): return
+    if not isLed: 
+        return
     
-    for i in range(3):
-        if (i % 2 == 0): set_effect(r=255, g=0, b=0)
-        else: set_effect(r=0, g=0, b=255)
-        rospy.sleep(1)     
-        set_effect(r=0, g=0, b=0)
-        rospy.sleep(1)
+    try:
+        for i in range(3):
+            if i % 2 == 0: 
+                set_effect(r=255, g=0, b=0)
+            else: 
+                set_effect(r=0, g=0, b=255)
+            rospy.sleep(1)     
+            set_effect(r=0, g=0, b=0)
+            rospy.sleep(1)
+    except rospy.ServiceException as e:
+        rospy.logwarn(f"LED service error: {e}")
 
 def setQr(qr_data:str):
     global detection_active, ros_initialized, found_qrs, attempt_active, all_found_flag, qr_detection_times, attempt_start_time, users_file_name
     
-    # Добавляем только новые уникальные QR-коды
     if ("MANUAL_QR" in qr_data or (qr_data not in found_qrs)) and len(found_qrs) < max_qrs:
         detection_time = time.time() - attempt_start_time
         
-        if (len(found_qrs) < max_qrs-1):
+        if len(found_qrs) < max_qrs-1:
             found_qrs.add(qr_data)
             qr_detection_times.append(detection_time)
-            print(f"Обнаружен новый QR-код: {qr_data} за {detection_time:.2f} секунд")
+            rospy.loginfo(f"Обнаружен новый QR-код: {qr_data} за {detection_time:.2f} секунд")
             qr_queue.put(qr_data)
             led_thread1 = threading.Thread(target=setFound)
             led_thread1.daemon = True
             led_thread1.start()
-        elif (len(found_qrs) == max_qrs-1):
+        elif len(found_qrs) == max_qrs-1:
             found_qrs.add(qr_data)
             qr_detection_times.append(detection_time)
-            print("Все QR-коды найдены!")
+            rospy.loginfo("Все QR-коды найдены!")
             all_found_flag = True
-            # Автоматически останавливаем попытку
             attempt_active = False
-            # Сохраняем результаты
             save_to_csv(users_file_name)
             qr_queue.put("ALL_FOUND")
             led_thread2 = threading.Thread(target=setEnd)
@@ -149,22 +178,28 @@ def image_callback(data):
                 qr_data = barcode.data.decode('utf-8')
                 setQr(qr_data=qr_data)
     except Exception as e:
-        print(f"Ошибка обработки изображения: {e}")
+        rospy.logerr(f"Ошибка обработки изображения: {e}")
 
 def init_ros():
-    global image_sub, ros_initialized
-    """Инициализация ROS в основном потоке"""
+    global image_sub, ros_initialized, max_qrs, port_server, isLed
     try:
-        rospy.init_node('qr_detector', anonymous=True, disable_signals=True)
-        image_sub = rospy.Subscriber('main_camera/image_raw', Image, image_callback)
+        rospy.init_node('qr_checker', anonymous=True)
+
+        max_qrs = rospy.get_param('~max_qrs', 5)
+        port_server = rospy.get_param('~port', 5000)
+        isLed = rospy.get_param('~led', True)
+        isNeedName = rospy.get_param('~isNeedName', True)
+
+        image_sub = rospy.Subscriber(rospy.get_param('~camera_topic', "main_camera/image_raw"), Image, image_callback)
         ros_initialized = True
-        print("ROS инициализирован успешно")
+        rospy.loginfo(f"Параметры запуска:\n Необходимое кол-во Qr:{max_qrs},\n Порт сервера:{port_server},\n Светодиодная индикация:{isLed},\n Необходимость ввода имени участника:{isNeedName}")
+        rospy.loginfo("Node мониторинга QR запущена")
     except Exception as e:
-        print(f"Failed to initialize ROS node: {e}")
+        rospy.logerr(f"Ошибка инициализации ROS Node: {e}")
 
 def reset_attempt():
     """Сброс попытки"""
-    global found_qrs, attempt_active, attempt_start_time, attempt_duration, all_found_flag, manual_qr_counter, qr_detection_times, participant_name
+    global found_qrs, attempt_active, attempt_start_time, attempt_duration, all_found_flag, manual_qr_counter, qr_detection_times
     found_qrs = set()
     attempt_active = False
     attempt_start_time = 0
@@ -172,10 +207,10 @@ def reset_attempt():
     all_found_flag = False
     manual_qr_counter = 0
     qr_detection_times = []
-    # participant_name = ""
 
-    print("Попытка сброшена")
+    rospy.loginfo("Попытка сброшена")
 
+# Flask routes (остаются без изменений, как в вашем оригинальном коде)
 @app.route('/')
 def index():
     return redirect('/qr_checker')
@@ -186,42 +221,35 @@ def qr_checker():
 
 @app.route('/qr_status')
 def qr_status():
-    """Проверяет наличие новых QR-кодов в очереди и возвращает статус"""
+    # ... (остальной код маршрутов остается точно таким же, как в вашем оригинале)
+    # Полный код маршрутов Flask
     global attempt_duration, attempt_start_time, qr_detection_times, attempt_active, all_found_flag
     
     qr_codes = []
     all_found = False
     
-    # Обновляем длительность попытки, если она активна
     if attempt_active and attempt_start_time > 0:
         attempt_duration = time.time() - attempt_start_time
     
-    # Извлекаем все доступные QR-коды из очереди
     while not qr_queue.empty():
         try:
             item = qr_queue.get_nowait()
             if item == "ALL_FOUND":
                 all_found = True
-                # Автоматически останавливаем попытку при нахождении всех QR-кодов
                 if attempt_active:
                     attempt_active = False
-                    # Сохраняем результаты
                     save_to_csv(users_file_name)
             else:
                 qr_codes.append(item)
         except:
             break
     
-    # Если все QR-коды найдены, устанавливаем флаг
     if len(found_qrs) >= max_qrs:
         all_found = True
-        # Автоматически останавливаем попытку при нахождении всех QR-кодов
         if attempt_active:
             attempt_active = False
-            # Сохраняем результаты
             save_to_csv(users_file_name)
     
-    # Создаем список статусов для каждого QR-кода
     qr_statuses = []
     for i in range(max_qrs):
         if i < len(found_qrs):
@@ -251,46 +279,35 @@ def qr_status():
 
 @app.route('/toggle_attempt', methods=['POST'])
 def toggle_attempt():
-    """Переключает состояние попытки (начать/остановить)"""
     global attempt_active, attempt_start_time, attempt_duration, all_found_flag, participant_name, qr_detection_times, users_file_name
     
     if not attempt_active:
-        # Проверяем имя участника, если требуется
         if require_name:
             name = request.json.get('participant_name', '') if request.json else ''
             if not name:
                 return jsonify({'status': 'error', 'message': 'Не указано имя участника'})
-            participant_name = name  # Устанавливаем имя до сброса
-            # print(f"Имя участника {name}")
+            participant_name = name
         
-        # Начинаем новую попытку (сбрасываем всё, кроме имени)
-        reset_attempt()  # Внутри reset_attempt() больше не сбрасывает participant_name
+        reset_attempt()
         attempt_active = True
         attempt_start_time = time.time()
         attempt_duration = 0
         qr_detection_times = []
-        print(f"Попытка начата для участника: {participant_name}")
+        rospy.loginfo(f"Попытка начата для участника: {participant_name}")
         return jsonify({'status': 'started', 'message': 'Попытка начата'})
     else:
-        # Останавливаем текущую попытку
         attempt_active = False
         attempt_duration = time.time() - attempt_start_time if attempt_start_time > 0 else 0
-        
-        # Сохраняем результаты
         save_to_csv(users_file_name)
-        
-        print("Попытка остановлена")
+        rospy.loginfo("Попытка остановлена")
         return jsonify({'status': 'stopped', 'message': 'Попытка остановлена'})
 
 @app.route('/download_existing_csv')
 def download_existing_csv():
-    """Отдает существующий CSV файл для скачивания"""
     try:
-        # Проверяем существование файла
         if not os.path.exists(users_file_name):
             return jsonify({'status': 'error', 'message': 'Файл не найден'}), 404
         
-        # Отправляем файл для скачивания
         return send_file(
             users_file_name,
             as_attachment=True,
@@ -298,13 +315,11 @@ def download_existing_csv():
             mimetype='text/csv'
         )
     except Exception as e:
-        print(f"Error downloading CSV: {e}")
+        rospy.logerr(f"Error downloading CSV: {e}")
         return jsonify({'status': 'error', 'message': 'Ошибка при скачивании файла'}), 500
-       
 
 @app.route('/manual_add_qr', methods=['POST'])
 def manual_add_qr():
-    """Ручное добавление QR-кода"""
     global found_qrs, manual_qr_counter, all_found_flag
     
     if not attempt_active:
@@ -313,7 +328,6 @@ def manual_add_qr():
     if all_found_flag:
         return jsonify({'status': 'error', 'message': 'Все QR-коды уже найдены'})
     
-    # Генерируем уникальный QR-код для ручного добавления
     manual_qr_counter += 1
     qr_data = f"MANUAL_QR_{manual_qr_counter}"
     setQr(qr_data=qr_data)
@@ -322,17 +336,23 @@ def manual_add_qr():
 
 @app.route('/reset_attempt', methods=['POST'])
 def reset_attempt_endpoint():
-    """Полный сброс состояния для нового цикла"""
     reset_attempt()
     return jsonify({'status': 'success', 'message': 'Состояние сброшено'})
 
 @app.route('/static/<path:filename>')
 def serve_static(filename):
-    """Сервис для обслуживания статических файлов"""
     return app.send_static_file(filename)
 
+def main():
+    global port_server
+    # Initialize ROS in main thread
+    init_ros()
+    if (not ros_initialized):
+        return
+
+    # Start Flask app
+    rospy.loginfo(f"Flask сервер запущен на порте {port_server}")
+    app.run(host='0.0.0.0', port=port_server, debug=False, use_reloader=False)
+
 if __name__ == '__main__':
-    ros_thread = threading.Thread(target=init_ros)
-    ros_thread.daemon = True
-    ros_thread.start()
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+    main()

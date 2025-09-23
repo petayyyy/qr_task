@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="simulator" default="false"/>
+    <arg name="max_qrs" default="5"/>
+    <arg name="port" default="5050"/>
+    <arg name="led" default="true"/>
+    <arg name="isNeedName" default="true"/>
+    <!-- <arg name="camera_topic" default="main_camera/image_raw"/> -->
+    <arg name="camera_topic" default="/main_camera/image_raw_throttled"/>
+
+    <!-- QR Detector Node -->
+    <node pkg="qr_checker" type="qr_checker_node.py" name="qr_checker" output="screen" respawn="true">
+        <!-- <param name="simulator" value="$(arg simulator)"/> -->
+        <param name="max_qrs" value="$(arg max_qrs)"/>
+        <param name="port" value="$(arg port)"/>
+        <param name="led" value="$(arg led)"/>
+        <param name="isNeedName" value="$(arg isNeedName)"/>
+        <param name="camera_topic" value="$(arg camera_topic)"/>
+    </node>
+</launch>
