@@ -10,7 +10,8 @@ cd no_ros
 Запусите веб сервер.  
 ```bash
 python3 main_no_ros.py
-```
+```  
+Теперь по аддресу http://localhost:5000/ запущена система оценивания задания по мониторингу Qr.
 ## Интеграция в clover.launch  
 Откройте clover.launch и модифицируйте его добавив в конце.  
 ```bash  
@@ -25,6 +26,11 @@ python3 main_no_ros.py
 Для запуска необходимо скопировать пакет в рабочию дирректорию Ros.  
 ```bash
 cp qr_checker ~/catkin_ws/src/
+```  
+Или скачать пакет с git.  
+```bash
+cd ~/catkin_ws/src/
+git clone https://github.com/petayyyy/qr_checker.git
 ```
 Собрать пакет.  
 ```bash
