@@ -461,13 +461,14 @@
             .then(data=>{
                 const qrList = document.getElementById('qr-list');
                 qrList.innerHTML = '';
-                
+                lastTimeDetected = 0;
                 data.qr_statuses.forEach((status, index)=>{
                     const qrItem = document.createElement('div');
                     qrItem.className = 'qr-status';
                     const statusText = document.createElement('span');
                     if (status.found) {
                         statusText.textContent = `QR ${index+1}: Найден (${formatTime(status.detection_time)})`;
+                        lastTimeDetected = status.detection_time;
                     } else {
                         statusText.textContent = `QR ${index+1}: Не найден`;
                     }
@@ -530,9 +531,14 @@
                     document.getElementById('timer').dataset.time = data.attempt_duration;
                     document.getElementById('timer').textContent = formatTime(data.attempt_duration);
                 }
+                else if (lastTimeDetected != 0 && document.getElementById('timer').dataset.time != lastTimeDetected){
+                    console.log(lastTimeDetected);
+                    document.getElementById('timer').dataset.time = lastTimeDetected;
+                    document.getElementById('timer').textContent = formatTime(lastTimeDetected);
+                }
             });
         }
-
+        
         function manualAddQr() {
             fetch('/manual_add_qr', {
                 method: 'POST',
