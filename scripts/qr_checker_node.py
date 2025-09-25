@@ -159,6 +159,7 @@ def setQr(qr_data:str):
         elif len(found_qrs) == max_qrs-1:
             found_qrs.add(qr_data)
             qr_detection_times.append(detection_time)
+            rospy.loginfo(f"Обнаружен последний QR-код: {qr_data} за {detection_time:.2f} секунд")
             rospy.loginfo("Все QR-коды найдены!")
             all_found_flag = True
             attempt_active = False
